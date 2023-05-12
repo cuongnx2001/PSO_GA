@@ -152,7 +152,7 @@ def decode(individual):
     # Clip all elements to be within [0,1]
     individual = np.clip(individual, 0, 1)
     return individual
-def PSO(num_pop=100, num_gen=700, c1=1.32, c2=1.32, w=0.24,v_max = 0.5):
+def PSO(num_pop=100, num_gen=3000, c1=1.32, c2=1.32, w=0.24,v_max = 0.5):
     start_time = time.time()
     # Initialize particles with random positions and velocities
     particles =  init_population(num_pop)
@@ -172,6 +172,8 @@ def PSO(num_pop=100, num_gen=700, c1=1.32, c2=1.32, w=0.24,v_max = 0.5):
     w_max = 0.9
     w = w_max
     w_damp = 0.99
+    # Initialize early stop counter
+    early_stop_counter = 0
     # Iterate through iterations
     for i in range(num_gen):
         # Update velocities and positions of particles
@@ -194,6 +196,11 @@ def PSO(num_pop=100, num_gen=700, c1=1.32, c2=1.32, w=0.24,v_max = 0.5):
             if fitness_value < global_best_fitness_value:
                 global_best_position = particles[j].copy()
                 global_best_fitness_value = fitness_value
+                # Reset early stop counter if new global best is found
+                early_stop_counter = 0
+            else:
+                # Increase early stop counter if global best is not updated
+                early_stop_counter += 1
         # Decrease v_max and increase w when iteration increases
         if i % 10 == 0:
             v_max *= 0.9
@@ -215,6 +222,10 @@ def PSO(num_pop=100, num_gen=700, c1=1.32, c2=1.32, w=0.24,v_max = 0.5):
                 writer = csv.writer(file)
                 writer.writerow([i+1, T, P_WPT, S, P_u, eta, algorithm_name, current_best_fitness])
         print(f"Iteration {i+1}: Best fitness value = {global_best_fitness_value}")
+        # Early stop if global best is not updated after 25 iterations
+        if early_stop_counter >= 25:
+            print("Early stop at iteration", i+1)
+            break
     end_time = time.time()
     # Return global best position
     return global_best_position,fitness(global_best_position), end_time - start_time
@@ -282,6 +293,10 @@ def GA(num_pop=100, num_gen=3000, crossover_rate=0.9, mutation_rate=0.1):
     start_time = time.time()
     # Initialize population
     population = init_population(num_pop)
+    # Initialize best fitness value
+    best_fitness = float('inf')
+    # Initialize counter for number of generations with no improvement
+    no_improvement_count = 0
     # Iterate through generations
     for i in range(num_gen):
         # Evaluate fitness of population
@@ -298,6 +313,16 @@ def GA(num_pop=100, num_gen=3000, crossover_rate=0.9, mutation_rate=0.1):
             with open(f'result_inter.csv', mode='a',newline='') as file:
                 writer = csv.writer(file)
                 writer.writerow([i+1, T, P_WPT, S, P_u, eta, algorithm_name, current_best_fitness])
+        # Check if best fitness has improved
+        if best < best_fitness:
+            best_fitness = best
+            no_improvement_count = 0
+        else:
+            no_improvement_count += 1
+        # Check if early stop condition is met
+        if no_improvement_count == 40:
+            print("Early stop at iteration", i+1)
+            break
         # Select parents
         sorted_population = [x for _, x in sorted(zip(fitness_values, population), key=lambda pair: pair[0])]
         num_top = int(num_pop * 0.3)
@@ -450,3 +475,30 @@ def grid_search_PSO():
     print(f"Best v_max: {best_v_max}")
     print(f"Best c1_c2: {best_c1_c2}")
     print(f"Best fitness: {best_fitness}")
+ 
+def grid_search_GA(num_pop=[50, 100, 150, 200], num_gen=[3000, 4000, 5000], mutation_rate=[0.01, 0.05, 0.1, 0.15], crossover_rate=[0.5, 0.7, 0.9]):
+    best_fitness = float('inf')
+    best_num_pop = None
+    best_num_gen = None
+    best_mutation_rate = None
+    best_crossover_rate = None
+    for pop in num_pop:
+        for gen in num_gen:
+            for rate in mutation_rate:
+                for cross in crossover_rate:
+                    ga = GA(num_pop=pop, num_gen=gen, mutation_rate=rate, crossover_rate=cross)
+                    _, fitness, _ = ga
+                    if fitness < best_fitness:
+                        best_fitness = fitness
+                        best_num_pop = pop
+                        best_num_gen = gen
+                        best_mutation_rate = rate
+                        best_crossover_rate = cross
+    print(f"Best num_pop: {best_num_pop}")
+    print(f"Best num_gen: {best_num_gen}")
+    print(f"Best mutation_rate: {best_mutation_rate}")
+    print(f"Best crossover_rate: {best_crossover_rate}")
+    print(f"Best fitness: {best_fitness}")
+
+
+
